@@ -1,0 +1,14 @@
+{
+  "name": "minecraft-bot-app",
+  "version": "1.0.0",
+  "description": "Minecraft AFK Bot Uygulamasi",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mineflayer": "^4.20.1",
+    "socks-proxy-agent": "^8.0.3"
+  }
+}

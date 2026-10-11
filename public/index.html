@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft AFK Bot Kontrolü</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1e1e1e; color: #fff; margin-top: 50px; }
+        button { background-color: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #status { margin-top: 20px; font-size: 16px; color: #ffeb3b; }
+    </style>
+</head>
+<body>
+    <h1>Minecraft AFK Bot Paneli</h1>
+    <p>15 Botu 2 Proxy ile Başlatmak için Tıkla</p>
+    <button onclick="startBots()">Botları Başlat</button>
+    <div id="status"></div>
+
+    <script>
+        function startBots() {
+            document.getElementById('status').innerText = "Botlar başlatılıyor...";
+            fetch('/api/start-bots')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        document.getElementById('status').innerText = "Başarılı! Botlar sırayla oyuna giriyor.";
+                    } else {
+                        document.getElementById('status').innerText = "Hata oluştu: " + data.error;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('status').innerText = "Bağlantı hatası!";
+                });
+        }
+    </script>
+</body>
+</html>
