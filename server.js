@@ -4,16 +4,7 @@ const { SocksProxyAgent } = require('socks-proxy-agent');
 const app = express();
 
 app.use(express.json());
-app.use(express.static('public')); // Arayüz için
-
-const SERVER_IP = "oyun.sunucusadresi.com";
-const SERVER_PORT = 25565;
-
-// Kullanılacak 2 adet proxy adresi (Burayı kendi proxy'lerinle değiştirebilirsin)
-const proxyList = [
-  "IP_ADRESI_1:PORT",
-  "IP_ADRESI_2:PORT"
-];
+app.use(express.static('public'));
 
 const startupCommands = [
   "/login sifreniz123",
@@ -24,20 +15,37 @@ const startupCommands = [
 const spamMessage = "Bu otomatik bir AFK spam mesajıdır!";
 const spamIntervalMs = 15000;
 
-// Botları Başlatma Endpoint'i
-app.get('/api/start-bots', (req, res) => {
+app.post('/api/start-bots', (req, res) => {
+  const { serverIp, serverPort, botNames, proxy1, proxy2 } = req.body;
+
+  if (!serverIp || !botNames) {
+    return res.json({ success: false, error: "Sunucu IP ve Bot isimleri boş olamaz!" });
+  }
+
+  // Girilen bot isimlerini virgülle ayırıp diziye çeviriyoruz (Örn: Bot1, Bot2, Bot3...)
+  const namesArray = botNames.split(',').map(name => name.trim()).filter(n => n);
+  const proxyList = [proxy1, proxy2].filter(p => p && p.trim() !== "");
+
   try {
-    for (let i = 1; i <= 15; i++) {
+    namesArray.forEach((username, index) => {
+      let proxy = null;
+      if (proxyList.length > 0) {
+        proxy = proxyList[index % proxyList.length];
+      }
+
       const botConfig = {
-        username: `BotKullanici${i}`,
-        proxy: proxyList[(i - 1) % proxyList.length]
+        username: username,
+        proxy: proxy,
+        host: serverIp,
+        port: parseInt(serverPort) || 25565
       };
 
       setTimeout(() => {
         createBotInstance(botConfig);
-      }, (i - 1) * 3000);
-    }
-    res.json({ success: true, message: "15 Bot başlatma komutu gönderildi!" });
+      }, index * 3000); // 3 saniye arayla girerler
+    });
+
+    res.json({ success: true, message: `${namesArray.length} bot başlatılıyor!` });
   } catch (error) {
     res.json({ success: false, error: error.message });
   }
@@ -45,13 +53,13 @@ app.get('/api/start-bots', (req, res) => {
 
 function createBotInstance(config) {
   const options = {
-    host: SERVER_IP,
-    port: SERVER_PORT,
+    host: config.host,
+    port: config.port,
     username: config.username,
     version: false
   };
 
-  if (config.proxy && !config.proxy.includes("IP_ADRESI")) {
+  if (config.proxy) {
     options.agent = new SocksProxyAgent(`socks://${config.proxy}`);
   }
 
@@ -70,8 +78,17 @@ function createBotInstance(config) {
       bot.chat(spamMessage);
     }, spamIntervalMs);
   });
+
+  bot.on('kicked', (reason) => {
+    console.log(`${config.username} atıldı: ${reason}`);
+  });
+
+  bot.on('error', (err) => {
+    console.log(`${config.username} hata: ${err.message}`);
+  });
 }
 
-app.listen(3000, () => {
-  console.log("Uygulama sunucusu aktif: http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Sunucu aktif: port ${PORT}`);
 });

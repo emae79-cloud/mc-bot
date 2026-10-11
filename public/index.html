@@ -5,33 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minecraft AFK Bot Kontrolü</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #1e1e1e; color: #fff; margin-top: 50px; }
-        button { background-color: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; }
+        body { font-family: Arial, sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; max-width: 400px; margin: auto; }
+        input, textarea { width: 100%; padding: 10px; margin: 8px 0; background: #2d2d2d; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; padding: 12px; width: 100%; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
         button:hover { background-color: #45a049; }
-        #status { margin-top: 20px; font-size: 16px; color: #ffeb3b; }
+        #status { margin-top: 15px; font-weight: bold; color: #ffeb3b; text-align: center; }
+        label { font-size: 14px; color: #bbb; }
     </style>
 </head>
 <body>
-    <h1>Minecraft AFK Bot Paneli</h1>
-    <p>15 Botu 2 Proxy ile Başlatmak için Tıkla</p>
+    <h2>Minecraft AFK Bot Paneli</h2>
+    
+    <label>Server IP:</label>
+    <input type="text" id="serverIp" placeholder="ornek.aternos.me">
+
+    <label>Server Port:</label>
+    <input type="text" id="serverPort" value="25565">
+
+    <label>Bot İsimleri (Virgülle ayırın):</label>
+    <textarea id="botNames" rows="3" placeholder="Bot1, Bot2, Bot3..."></textarea>
+
+    <label>Proxy 1 (IP:Port):</label>
+    <input type="text" id="proxy1" placeholder="123.45.67.1:1080">
+
+    <label>Proxy 2 (IP:Port):</label>
+    <input type="text" id="proxy2" placeholder="123.45.67.2:1080">
+
     <button onclick="startBots()">Botları Başlat</button>
     <div id="status"></div>
 
     <script>
         function startBots() {
+            const data = {
+                serverIp: document.getElementById('serverIp').value,
+                serverPort: document.getElementById('serverPort').value,
+                botNames: document.getElementById('botNames').value,
+                proxy1: document.getElementById('proxy1').value,
+                proxy2: document.getElementById('proxy2').value
+            };
+
             document.getElementById('status').innerText = "Botlar başlatılıyor...";
-            fetch('/api/start-bots')
-                .then(res => res.json())
-                .then(data => {
-                    if(data.success) {
-                        document.getElementById('status').innerText = "Başarılı! Botlar sırayla oyuna giriyor.";
-                    } else {
-                        document.getElementById('status').innerText = "Hata oluştu: " + data.error;
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('status').innerText = "Bağlantı hatası!";
-                });
+
+            fetch('/api/start-bots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if(result.success) {
+                    document.getElementById('status').innerText = result.message;
+                } else {
+                    document.getElementById('status').innerText = "Hata: " + result.error;
+                }
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "Bağlantı hatası!";
+            });
         }
     </script>
 </body>
