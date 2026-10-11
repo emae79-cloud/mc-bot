@@ -3,31 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Gelişmiş AFK Kontrol Paneli</title>
+    <title>Minecraft Gelişmiş AFK Paneli</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; padding: 15px; max-width: 500px; margin: auto; cursor: default; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; padding: 15px; max-width: 500px; margin: auto; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
         input, textarea, select { width: 100%; padding: 10px; margin: 6px 0; background: #2d2d2d; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
         button { background-color: #4CAF50; color: white; padding: 10px; font-size: 15px; border: none; border-radius: 5px; cursor: pointer; margin-top: 5px; width: 100%; font-weight: bold; }
         button:hover { background-color: #45a049; }
         .btn-auto { background-color: #2196F3; margin-bottom: 8px; }
-        .btn-auto:hover { background-color: #0b7dda; }
+        .btn-stop { background-color: #f44336; }
         .grid-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
         .grid-controls button { background: #333; }
-        .grid-controls button:hover { background: #555; }
+        .log-box { background: #000; color: #00ff00; padding: 10px; height: 130px; overflow-y: scroll; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid #444; }
         #status { margin-top: 10px; font-weight: bold; color: #ffeb3b; text-align: center; }
         label { font-size: 13px; color: #aaa; }
-        ul { padding-left: 15px; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <h2 style="text-align: center; color: #4CAF50;">Minecraft AFK Kontrol Paneli</h2>
 
-    <!-- BAĞLANTI & BOT AYARLARI -->
+    <!-- 1. BAĞLANTI & SPAM AYARLARI -->
     <div class="card">
         <h3>1. Sunucu ve Bot Yapılandırması</h3>
-        <button class="btn-auto" onclick="fillDefaults()">IP ve Bilgileri Otomatik Doldur</button>
+        <button class="btn-auto" onclick="fillDefaults()">Örnek Bilgileri Otomatik Doldur</button>
         
         <label>Server IP:</label>
         <input type="text" id="serverIp" placeholder="oyun.sunucu.com">
@@ -35,8 +34,14 @@
         <label>Server Port:</label>
         <input type="text" id="serverPort" value="25565">
 
-        <label>Bot İsimleri ve Şifreleri (Her satıra: BotAdi Sifre - Boşluk bırakarak):</label>
-        <textarea id="botsData" rows="4" placeholder="BotKullanici1 Sifre123\nBotKullanici2 Sifre456"></textarea>
+        <label>Bot İsimleri ve Şifreleri (Her satıra: BotAdi Sifre):</label>
+        <textarea id="botsData" rows="3" placeholder="AhmetBot sifre123&#10;MehmetBot sifre456"></textarea>
+
+        <label>Spam Mesajı:</label>
+        <input type="text" id="spamText" value="Bu otomatik bir AFK spam mesajıdır!">
+
+        <label>Spam Süresi (Saniye):</label>
+        <input type="text" id="spamTime" value="15">
 
         <label>Proxy 1 (IP:Port):</label>
         <input type="text" id="proxy1" placeholder="123.45.67.1:1080">
@@ -45,14 +50,15 @@
         <input type="text" id="proxy2" placeholder="123.45.67.2:1080">
 
         <button onclick="startBots()">Tüm Botları Başlat</button>
+        <button class="btn-stop" onclick="stopBot()">Seçili Botu Durdur</button>
         <div id="status"></div>
     </div>
 
-    <!-- OYUN İÇİ KONTROL VE HAREKET -->
+    <!-- 2. HAREKET VE KONTROL -->
     <div class="card">
-        <h3>2. Bot Kontrol ve Hareket Paneli</h3>
+        <h3>2. Bot Hareket ve Komut Paneli</h3>
         <label>Yönetilecek Bot Adı:</label>
-        <input type="text" id="targetBot" placeholder="BotKullanici1">
+        <input type="text" id="targetBot" placeholder="AhmetBot">
 
         <div class="grid-controls">
             <div></div>
@@ -66,28 +72,32 @@
             <div></div>
         </div>
 
-        <label style="margin-top: 10px; display:block;">Özel Komut Gönder:</label>
-        <input type="text" id="customChat" placeholder="/warp lobi">
-        <button onclick="sendChatCommand()">Komut Gönder / Yaz</button>
+        <label style="margin-top: 10px; display:block;">Özel Komut / Sohbet Yaz:</label>
+        <input type="text" id="customChat" placeholder="/warp lobi veya Selam">
+        <button onclick="sendChatCommand()">Gönder</button>
     </div>
 
-    <!-- ENVANTER GÖRÜNTÜLEME -->
+    <!-- 3. CANLI SOHBET & LOG AKIŞI -->
     <div class="card">
-        <h3>3. Bot Envanteri ve Eşya Listesi</h3>
-        <button onclick="getInventory()" style="background-color: #ff9800;">Envanteri Göster</button>
-        <ul id="inventoryList">
+        <h3>3. Canlı Sohbet ve Bot Logları</h3>
+        <label>Bot Log Ekranı (Oto-Güncellenir):</label>
+        <div id="liveLogs" class="log-box">Botlar başlatıldığında loglar burada görünecek...</div>
+    </div>
+
+    <!-- 4. ENVANTER -->
+    <div class="card">
+        <h3>4. Bot Envanteri</h3>
+        <button onclick="getInventory()" style="background-color: #ff9800;">Envanteri Gör</button>
+        <ul id="inventoryList" style="padding-left: 15px; font-size: 13px;">
             <li>Envanter bilgisi için bot adı girip butona basın.</li>
         </ul>
     </div>
 
     <script>
-        // Otomatik Doldurma Fonksiyonu
         function fillDefaults() {
             document.getElementById('serverIp').value = "oyun.sunucusadresi.com";
             document.getElementById('serverPort').value = "25565";
-            document.getElementById('botsData').value = "AhmetBot sifre123\nMehmetBot sifre456\nCanBot sifre789";
-            document.getElementById('proxy1').value = "192.168.1.50:1080";
-            document.getElementById('proxy2').value = "192.168.1.51:1080";
+            document.getElementById('botsData').value = "AhmetBot sifre123\nMehmetBot sifre456";
             document.getElementById('targetBot').value = "AhmetBot";
         }
 
@@ -96,6 +106,8 @@
                 serverIp: document.getElementById('serverIp').value,
                 serverPort: document.getElementById('serverPort').value,
                 botsData: document.getElementById('botsData').value,
+                spamText: document.getElementById('spamText').value,
+                spamTime: document.getElementById('spamTime').value,
                 proxy1: document.getElementById('proxy1').value,
                 proxy2: document.getElementById('proxy2').value
             };
@@ -109,18 +121,26 @@
             })
             .then(res => res.json())
             .then(result => {
-                if(result.success) {
-                    document.getElementById('status').innerText = result.message;
-                } else {
-                    document.getElementById('status').innerText = "Hata: " + result.error;
-                }
+                document.getElementById('status').innerText = result.message || result.error;
             });
+        }
+
+        function stopBot() {
+            const botName = document.getElementById('targetBot').value;
+            if(!botName) { alert("Durdurulacak bot adını yazın!"); return; }
+
+            fetch('/api/stop-bot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ botName })
+            })
+            .then(res => res.json())
+            .then(result => alert(result.message || result.error));
         }
 
         function sendAction(action) {
             const botName = document.getElementById('targetBot').value;
-            if(!botName) { alert("Lütfen kontrol edilecek bot adını yazın!"); return; }
-
+            if(!botName) return;
             fetch('/api/bot-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -131,7 +151,7 @@
         function sendChatCommand() {
             const botName = document.getElementById('targetBot').value;
             const message = document.getElementById('customChat').value;
-            if(!botName || !message) { alert("Bot adı ve mesaj boş olamaz!"); return; }
+            if(!botName || !message) return;
 
             fetch('/api/bot-action', {
                 method: 'POST',
@@ -143,7 +163,7 @@
 
         function getInventory() {
             const botName = document.getElementById('targetBot').value;
-            if(!botName) { alert("Lütfen bot adı girin!"); return; }
+            if(!botName) return;
 
             fetch('/api/bot-action', {
                 method: 'POST',
@@ -161,10 +181,27 @@
                         list.appendChild(li);
                     });
                 } else {
-                    list.innerHTML = "<li>Envanter boş veya bot bulunamadı.</li>";
+                    list.innerHTML = "<li>Envanter boş.</li>";
                 }
             });
         }
+
+        // Canlı Logları Otomatik Çekme Döngüsü (Her 2 saniyede bir)
+        setInterval(() => {
+            const targetBot = document.getElementById('targetBot').value;
+            if (!targetBot) return;
+
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data[targetBot]) {
+                        const logs = data[targetBot].logs;
+                        const logBox = document.getElementById('liveLogs');
+                        logBox.innerText = logs.join('\n');
+                        logBox.scrollTop = logBox.scrollHeight; // Otomatik aşağı kaydır
+                    }
+                });
+        }, 2000);
     </script>
 </body>
 </html>
