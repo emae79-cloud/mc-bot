@@ -6,18 +6,20 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-// Aktif botları tutacağımız hafıza
-let activeBots = {};
+let activeBots = {}; // Botları ve durumlarını tutar
+let globalSpamConfig = { text: "Bu otomatik bir AFK spam mesajıdır!", interval: 15000 };
 
 // Botları Başlatma Endpoint'i
 app.post('/api/start-bots', (req, res) => {
-  const { serverIp, serverPort, botsData, proxy1, proxy2 } = req.body;
+  const { serverIp, serverPort, botsData, proxy1, proxy2, spamText, spamTime } = req.body;
 
   if (!serverIp || !botsData) {
     return res.json({ success: false, error: "Sunucu IP ve bot bilgileri boş olamaz!" });
   }
 
-  // botsData formatı: "Bot1 sifre1\nBot2 sifre2" şeklinde satır satır gelir
+  if (spamText) globalSpamConfig.text = spamText;
+  if (spamTime) globalSpamConfig.interval = parseInt(spamTime) * 1000;
+
   const botLines = botsData.split('\n').filter(line => line.trim() !== "");
   const proxyList = [proxy1, proxy2].filter(p => p && p.trim() !== "");
 
@@ -25,7 +27,7 @@ app.post('/api/start-bots', (req, res) => {
     botLines.forEach((line, index) => {
       const parts = line.trim().split(/\s+/);
       const username = parts[0];
-      const password = parts[1] || ""; // Eğer şifre girilmediyse boş bırakır
+      const password = parts[1] || "";
 
       if (!username) return;
 
@@ -34,7 +36,7 @@ app.post('/api/start-bots', (req, res) => {
         proxy = proxyList[index % proxyList.length];
       }
 
-      const botConfig = {
+      const config = {
         username: username,
         password: password,
         proxy: proxy,
@@ -43,24 +45,51 @@ app.post('/api/start-bots', (req, res) => {
       };
 
       setTimeout(() => {
-        createBotInstance(botConfig);
+        createBotInstance(config);
       }, index * 3000);
     });
 
-    res.json({ success: true, message: `${botLines.length} bot sırayla başlatılıyor!` });
+    res.json({ success: true, message: `${botLines.length} bot başlatılıyor (Auto-Reconnect aktif)!` });
   } catch (error) {
     res.json({ success: false, error: error.message });
   }
 });
 
-// Bot Aksiyonları (Hareket, Komut, Envanter vb.)
+// Tüm Botların Canlı Durumlarını ve Loglarını Çekme Endpoint'i
+app.get('/api/status', (req, res) => {
+  let statusData = {};
+  for (let name in activeBots) {
+    statusData[name] = {
+      status: activeBots[name].status,
+      health: activeBots[name].health,
+      food: activeBots[name].food,
+      logs: activeBots[name].logs.slice(-15) // Son 15 log satırı
+    };
+  }
+  res.json(statusData);
+});
+
+// Tek Bir Botu Durdurma
+app.post('/api/stop-bot', (req, res) => {
+  const { botName } = req.body;
+  if (activeBots[botName] && activeBots[botName].bot) {
+    activeBots[botName].manualStop = true;
+    activeBots[botName].bot.quit();
+    delete activeBots[botName];
+    return res.json({ success: true, message: `${botName} durduruldu.` });
+  }
+  res.json({ success: false, error: "Bot bulunamadı." });
+});
+
+// Bot Aksiyonları (Hareket, Sohbet, Envanter)
 app.post('/api/bot-action', (req, res) => {
   const { botName, action, value } = req.body;
-  const bot = activeBots[botName];
+  const botObj = activeBots[botName];
 
-  if (!bot) {
+  if (!botObj || !botObj.bot) {
     return res.json({ success: false, error: "Bot oyunda veya aktif değil!" });
   }
+  const bot = botObj.bot;
 
   try {
     switch (action) {
@@ -71,7 +100,6 @@ app.post('/api/bot-action', (req, res) => {
       case 'jump': bot.setControlState('jump', true); setTimeout(() => bot.setControlState('jump', false), 300); break;
       case 'chat': bot.chat(value); break;
       case 'inventory':
-        // Envanterdeki eşyaları ve isimlerini toplama
         const items = bot.inventory.items().map(item => ({
           name: item.name,
           count: item.count,
@@ -86,6 +114,8 @@ app.post('/api/bot-action', (req, res) => {
 });
 
 function createBotInstance(config) {
+  if (activeBots[config.username] && activeBots[config.username].manualStop) return;
+
   const options = {
     host: config.host,
     port: config.port,
@@ -98,27 +128,90 @@ function createBotInstance(config) {
   }
 
   const bot = createBot(options);
-  activeBots[config.username] = bot;
+
+  if (!activeBots[config.username]) {
+    activeBots[config.username] = { logs: [], status: "Bağlanıyor...", health: 20, food: 20, manualStop: false };
+  }
+  activeBots[config.username].bot = bot;
+
+  function addLog(msg) {
+    const time = new Date().toLocaleTimeString();
+    const fullMsg = `[${time}] ${msg}`;
+    if (activeBots[config.username]) {
+      activeBots[config.username].logs.push(fullMsg);
+      if (activeBots[config.username].logs.length > 50) activeBots[config.username].logs.shift();
+    }
+  }
 
   bot.on('spawn', () => {
-    console.log(`${config.username} oyuna giriş yaptı!`);
+    addLog("Oyuna başarıyla giriş yaptı!");
+    activeBots[config.username].status = "Aktif (Oyunda)";
 
-    // Eğer şifre tanımlandıysa otomatik login komutu gönder
     if (config.password) {
       setTimeout(() => {
         bot.chat(`/login ${config.password}`);
+        addLog("Otomatik şifre gönderildi.");
       }, 2000);
     }
 
-    // Spam mesaj döngüsü (15 saniyede bir)
-    setInterval(() => {
-      bot.chat("Bu otomatik bir AFK spam mesajıdır!");
-    }, 15000);
+    // Spam Döngüsü
+    const spamId = setInterval(() => {
+      bot.chat(globalSpamConfig.text);
+      addLog(`Spam gönderildi: ${globalSpamConfig.text}`);
+    }, globalSpamConfig.interval);
+    activeBots[config.username].spamIntervalId = spamId;
+
+    // Olmazsa Olmaz: Anti-AFK Kafa Çevirme (Atılmamak için)
+    const antiAfkId = setInterval(() => {
+      const yaw = Math.random() * Math.PI * 2;
+      const pitch = (Math.random() * Math.PI) - (Math.PI / 2);
+      bot.look(yaw, pitch, true);
+    }, 12000);
+    activeBots[config.username].antiAfkId = antiAfkId;
   });
 
-  bot.on('end', () => {
-    delete activeBots[config.username];
+  bot.on('health', () => {
+    if (bot.health !== undefined) activeBots[config.username].health = bot.health;
+    if (bot.food !== undefined) activeBots[config.username].food = bot.food;
   });
+
+  bot.on('chat', (username, message) => {
+    if (username !== bot.username) {
+      addLog(`<${username}> ${message}`);
+    }
+  });
+
+  bot.on('kicked', (reason) => {
+    addLog(`Atıldı! Sebep: ${reason}`);
+    cleanupAndReconnect(config);
+  });
+
+  bot.on('end', (reason) => {
+    addLog(`Bağlantı koptu: ${reason}`);
+    cleanupAndReconnect(config);
+  });
+
+  bot.on('error', (err) => {
+    addLog(`Hata: ${err.message}`);
+  });
+}
+
+function cleanupAndReconnect(config) {
+  if (activeBots[config.username]) {
+    if (activeBots[config.username].spamIntervalId) clearInterval(activeBots[config.username].spamIntervalId);
+    if (activeBots[config.username].antiAfkId) clearInterval(activeBots[config.username].antiAfkId);
+    
+    if (activeBots[config.username].manualStop) return; // Manuel durdurulduysa tekrar bağlanma
+
+    activeBots[config.username].status = "Koptu, 5s sonra bağlanacak...";
+  }
+
+  // Auto-Reconnect (Otomatik Yeniden Bağlanma)
+  setTimeout(() => {
+    if (!activeBots[config.username] || !activeBots[config.username].manualStop) {
+      createBotInstance(config);
+    }
+  }, 5000);
 }
 
 const PORT = process.env.PORT || 3000;
