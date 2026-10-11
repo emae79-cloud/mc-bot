@@ -3,43 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft AFK Bot Kontrolü</title>
+    <title>Minecraft Gelişmiş AFK Kontrol Paneli</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; max-width: 400px; margin: auto; }
-        input, textarea { width: 100%; padding: 10px; margin: 8px 0; background: #2d2d2d; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
-        button { background-color: #4CAF50; color: white; padding: 12px; width: 100%; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; padding: 15px; max-width: 500px; margin: auto; cursor: default; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
+        input, textarea, select { width: 100%; padding: 10px; margin: 6px 0; background: #2d2d2d; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; padding: 10px; font-size: 15px; border: none; border-radius: 5px; cursor: pointer; margin-top: 5px; width: 100%; font-weight: bold; }
         button:hover { background-color: #45a049; }
-        #status { margin-top: 15px; font-weight: bold; color: #ffeb3b; text-align: center; }
-        label { font-size: 14px; color: #bbb; }
+        .btn-auto { background-color: #2196F3; margin-bottom: 8px; }
+        .btn-auto:hover { background-color: #0b7dda; }
+        .grid-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
+        .grid-controls button { background: #333; }
+        .grid-controls button:hover { background: #555; }
+        #status { margin-top: 10px; font-weight: bold; color: #ffeb3b; text-align: center; }
+        label { font-size: 13px; color: #aaa; }
+        ul { padding-left: 15px; font-size: 14px; }
     </style>
 </head>
 <body>
-    <h2>Minecraft AFK Bot Paneli</h2>
-    
-    <label>Server IP:</label>
-    <input type="text" id="serverIp" placeholder="ornek.aternos.me">
 
-    <label>Server Port:</label>
-    <input type="text" id="serverPort" value="25565">
+    <h2 style="text-align: center; color: #4CAF50;">Minecraft AFK Kontrol Paneli</h2>
 
-    <label>Bot İsimleri (Virgülle ayırın):</label>
-    <textarea id="botNames" rows="3" placeholder="Bot1, Bot2, Bot3..."></textarea>
+    <!-- BAĞLANTI & BOT AYARLARI -->
+    <div class="card">
+        <h3>1. Sunucu ve Bot Yapılandırması</h3>
+        <button class="btn-auto" onclick="fillDefaults()">IP ve Bilgileri Otomatik Doldur</button>
+        
+        <label>Server IP:</label>
+        <input type="text" id="serverIp" placeholder="oyun.sunucu.com">
 
-    <label>Proxy 1 (IP:Port):</label>
-    <input type="text" id="proxy1" placeholder="123.45.67.1:1080">
+        <label>Server Port:</label>
+        <input type="text" id="serverPort" value="25565">
 
-    <label>Proxy 2 (IP:Port):</label>
-    <input type="text" id="proxy2" placeholder="123.45.67.2:1080">
+        <label>Bot İsimleri ve Şifreleri (Her satıra: BotAdi Sifre - Boşluk bırakarak):</label>
+        <textarea id="botsData" rows="4" placeholder="BotKullanici1 Sifre123\nBotKullanici2 Sifre456"></textarea>
 
-    <button onclick="startBots()">Botları Başlat</button>
-    <div id="status"></div>
+        <label>Proxy 1 (IP:Port):</label>
+        <input type="text" id="proxy1" placeholder="123.45.67.1:1080">
+
+        <label>Proxy 2 (IP:Port):</label>
+        <input type="text" id="proxy2" placeholder="123.45.67.2:1080">
+
+        <button onclick="startBots()">Tüm Botları Başlat</button>
+        <div id="status"></div>
+    </div>
+
+    <!-- OYUN İÇİ KONTROL VE HAREKET -->
+    <div class="card">
+        <h3>2. Bot Kontrol ve Hareket Paneli</h3>
+        <label>Yönetilecek Bot Adı:</label>
+        <input type="text" id="targetBot" placeholder="BotKullanici1">
+
+        <div class="grid-controls">
+            <div></div>
+            <button onclick="sendAction('forward')">İleri W</button>
+            <div></div>
+            <button onclick="sendAction('left')">Sol A</button>
+            <button onclick="sendAction('jump')">Zıpla</button>
+            <button onclick="sendAction('right')">Sağ D</button>
+            <div></div>
+            <button onclick="sendAction('back')">Geri S</button>
+            <div></div>
+        </div>
+
+        <label style="margin-top: 10px; display:block;">Özel Komut Gönder:</label>
+        <input type="text" id="customChat" placeholder="/warp lobi">
+        <button onclick="sendChatCommand()">Komut Gönder / Yaz</button>
+    </div>
+
+    <!-- ENVANTER GÖRÜNTÜLEME -->
+    <div class="card">
+        <h3>3. Bot Envanteri ve Eşya Listesi</h3>
+        <button onclick="getInventory()" style="background-color: #ff9800;">Envanteri Göster</button>
+        <ul id="inventoryList">
+            <li>Envanter bilgisi için bot adı girip butona basın.</li>
+        </ul>
+    </div>
 
     <script>
+        // Otomatik Doldurma Fonksiyonu
+        function fillDefaults() {
+            document.getElementById('serverIp').value = "oyun.sunucusadresi.com";
+            document.getElementById('serverPort').value = "25565";
+            document.getElementById('botsData').value = "AhmetBot sifre123\nMehmetBot sifre456\nCanBot sifre789";
+            document.getElementById('proxy1').value = "192.168.1.50:1080";
+            document.getElementById('proxy2').value = "192.168.1.51:1080";
+            document.getElementById('targetBot').value = "AhmetBot";
+        }
+
         function startBots() {
             const data = {
                 serverIp: document.getElementById('serverIp').value,
                 serverPort: document.getElementById('serverPort').value,
-                botNames: document.getElementById('botNames').value,
+                botsData: document.getElementById('botsData').value,
                 proxy1: document.getElementById('proxy1').value,
                 proxy2: document.getElementById('proxy2').value
             };
@@ -58,9 +114,55 @@
                 } else {
                     document.getElementById('status').innerText = "Hata: " + result.error;
                 }
+            });
+        }
+
+        function sendAction(action) {
+            const botName = document.getElementById('targetBot').value;
+            if(!botName) { alert("Lütfen kontrol edilecek bot adını yazın!"); return; }
+
+            fetch('/api/bot-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ botName, action })
+            });
+        }
+
+        function sendChatCommand() {
+            const botName = document.getElementById('targetBot').value;
+            const message = document.getElementById('customChat').value;
+            if(!botName || !message) { alert("Bot adı ve mesaj boş olamaz!"); return; }
+
+            fetch('/api/bot-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ botName, action: 'chat', value: message })
+            });
+            document.getElementById('customChat').value = "";
+        }
+
+        function getInventory() {
+            const botName = document.getElementById('targetBot').value;
+            if(!botName) { alert("Lütfen bot adı girin!"); return; }
+
+            fetch('/api/bot-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ botName, action: 'inventory' })
             })
-            .catch(err => {
-                document.getElementById('status').innerText = "Bağlantı hatası!";
+            .then(res => res.json())
+            .then(result => {
+                const list = document.getElementById('inventoryList');
+                list.innerHTML = "";
+                if(result.success && result.inventory.length > 0) {
+                    result.inventory.forEach(item => {
+                        const li = document.createElement('li');
+                        li.innerText = `${item.displayName} (Adet: ${item.count})`;
+                        list.appendChild(li);
+                    });
+                } else {
+                    list.innerHTML = "<li>Envanter boş veya bot bulunamadı.</li>";
+                }
             });
         }
     </script>
